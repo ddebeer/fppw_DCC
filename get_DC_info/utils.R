@@ -1,10 +1,17 @@
 rm_substrings <- function(character_string, substrings_to_rm){
-  for(substring in substrings_to_rm){
-    character_string <- gsub(substring, "", character_string, fixed = TRUE)
+  while(any(sapply(substrings_to_rm, grepl, x = character_string, fixed = TRUE))){
+    for(substring in substrings_to_rm){
+      character_string <- gsub(substring, "", character_string, fixed = TRUE)
+    }
   }
   character_string
 }
 
+clean_ch <- function(character_string){
+  out <- gsub("?.", "?", character_string, fixed = TRUE)
+  out <- gsub("; )", ")", out, fixed = TRUE)
+  out <- rm_substrings(out, c(",   ()", "..", ";  ", ", ()"))
+}
 
 
 add_blocks1 <- function(rdocx, list_of_block_lists){
@@ -74,32 +81,79 @@ preprocess_data <- function(data){
 extract_info_row <- function(row, type = c("html", ".docx")){
   
   type <- match.arg(type)
-  # If more than two promoters, than add ...
-  n_promo <- with(row, sum(c(Functietype_Begel_1, Functietype_Begel_2, Functietype_Begel_3, 
-                             Functietype_Begel_4, Functietype_Begel_5) == "Promotor", 
-                           na.rm = TRUE) + 1)
-  add <- switch(as.character(n_promo), 
-                "3" = "(motivering drie promotoren)",
-                "4" = "(motivering vier promotoren)",
-                "5" = "(motivering vijf promotoren)", 
-                "")
+  # get promoters
+  promoters <- which(with(row, c(Functietype_Begel_1, Functietype_Begel_2, 
+                                 Functietype_Begel_3, Functietype_Begel_4, 
+                                 Functietype_Begel_5) == "Promotor"))
+  
+  # get other members of the committee
+  other_members <- which(with(row, c(Functietype_Begel_1, Functietype_Begel_2, 
+                                     Functietype_Begel_3, Functietype_Begel_4, 
+                                     Functietype_Begel_5) == "Doctoraatsbegeleidingscommissielid"))
+  
+  n_promo <- length(promoters) + 1
+  
+  # If more than two promoters, then add ...
+  add1 <- switch(as.character(n_promo), 
+                 "2" = "(Voldoende inhoudelijke motivering in OASIS?) ",
+                 "3" = "(extra omstandige motivering voro drie promotoren?) ",
+                 "4" = "(motivering vier promotoren) ",
+                 "5" = "(motivering vijf promotoren) ", 
+                 "")
+  
+  # If a promoter is not zap, then add..
+  promoter_N_prof <- !grepl("Professor", 
+        c(row$Aanspreekvorm_Begel_1, row$Aanspreekvorm_Begel_2, 
+          row$Aanspreekvorm_Begel_3, row$Aanspreekvorm_Begel_4, 
+          row$Aanspreekvorm_Begel_5)[promoters], fixed = TRUE)
+  add2 <- 'if'(any(promoter_N_prof),
+               paste0("(niet-ZAP promotor (", 
+                      c(row$Voornaam_Begel_1, row$Voornaam_Begel_2, 
+                        row$Voornaam_Begel_3, row$Voornaam_Begel_4, 
+                        row$Voornaam_Begel_5)[promoters][promoter_N_prof],
+                      " ",
+                      c(row$Naam_Begel_1, row$Naam_Begel_2, 
+                        row$Naam_Begel_3, row$Naam_Begel_4, 
+                        row$Naam_Begel_5)[promoters][promoter_N_prof],
+                      ")?)"),
+               "")
+  
+  
+  # If 3 promoters, then at least 2 different research groups
+  add3 <- ""
+  if(n_promo == 3){
+    units <- c(row$Vakgroep_Adm_Prom, c(row$Vakgroepcode_Begel_1, row$Vakgroepcode_Begel_2, 
+                                        row$Vakgroepcode_Begel_3, row$Vakgroepcode_Begel_4, 
+                                        row$Vakgroepcode_Begel_5)[promoters])
+    if(length(unique(units)) == 1){
+      add3 <- " (drie promotoren van minstens twee verschillende vakgroepen?)"
+    }
+  }
+  
+  
+  committee <- with(row, 
+    c(paste0(Voornaam_Begel_1, " ", Naam_Begel_1," (", Functietype_Begel_1, "; ", Vakgroepcode_Begel_1, ")"),
+      paste0(Voornaam_Begel_2, " ", Naam_Begel_2," (", Functietype_Begel_2, "; ", Vakgroepcode_Begel_2, ")"),
+      paste0(Voornaam_Begel_3, " ", Naam_Begel_3," (", Functietype_Begel_3, "; ", Vakgroepcode_Begel_3, ")"),
+      paste0(Voornaam_Begel_4, " ", Naam_Begel_4," (", Functietype_Begel_4, "; ", Vakgroepcode_Begel_4, ")"),
+      paste0(Voornaam_Begel_5, " ", Naam_Begel_5," (", Functietype_Begel_5, "; ", Vakgroepcode_Begel_5, ")")))
+  
+  committee <- c(committee[promoters], committee[other_members])
+  committee <- paste(committee, collapse = ", ")
+  
   
   
   if(type == "html"){
     out <- with(row, paste0("<div><b>", Naam_Std, ", ", Voornaam_Std, "</b>, ", Basis, 
                             " (administratief promotor: ", Voornaam_Adm_Prom, " ", Naam_Adm_Prom, 
-                            " (", Vakgroepcode_Adm_Prom, ")), <b>VOEG BIJLAGES TOE</b>. ", add, 
+                            " (", Vakgroepcode_Adm_Prom, ")), <b>VOEG BIJLAGES TOE</b>. ", add1, add2, add3,
                             "</div> <br> <div><em>Nederlandstalige titel</em>: ", Titel_doct_onderzoek_nl, 
                             ".</div> <br> <div><em>Engelstalige titel</em>: ", Titel_doct_onderzoek_en, ".</div> <br>  <div>",
                             "Begeleidingscommissie: ", Voornaam_Adm_Prom, " ", Naam_Adm_Prom,
-                            " (administratief promotor), ", 
-                            Voornaam_Begel_1, " ", Naam_Begel_1," (", Functietype_Begel_1, "), ",
-                            Voornaam_Begel_2, " ", Naam_Begel_2," (", Functietype_Begel_2, "), ",
-                            Voornaam_Begel_3, " ", Naam_Begel_3," (", Functietype_Begel_3, "), ",
-                            Voornaam_Begel_4, " ", Naam_Begel_4," (", Functietype_Begel_4, "), ",
-                            Voornaam_Begel_5, " ", Naam_Begel_5," (", Functietype_Begel_5, "). </div> <br> <br> "))
+                            " (administratief promotor, ", Vakgroepcode_Adm_Prom ,"), ", 
+                            committee, ". </div> <br> <br> "))
     
-    out <- rm_substrings(out, c(",   ()", ".."))
+    out <- clean_ch(out)
     return(out)
   }
   # most of the used functions come from the officer-package
@@ -116,7 +170,7 @@ extract_info_row <- function(row, type = c("html", ".docx")){
       ftext(paste0(Naam_Std, ", ", Voornaam_Std, ", "), bold),
       ftext(paste0(Basis, " (administratief promotor: ", Voornaam_Adm_Prom, " ", 
                    Naam_Adm_Prom, " (", Vakgroepcode_Adm_Prom, 
-                   ")), VOEG BIJLAGES TOE. ", add), norm),
+                   ")), VOEG BIJLAGES TOE. ", add1, add2, add3), norm),
       fp_p = para),
     fpar(
       ftext("", norm),
@@ -136,15 +190,10 @@ extract_info_row <- function(row, type = c("html", ".docx")){
       ftext("", norm),
       fp_p = para),
     fpar(
-      ftext(rm_substrings(
+      ftext(clean_ch(
         paste0("Begeleidingscommissie: ", Voornaam_Adm_Prom, " ", 
-               Naam_Adm_Prom, " (administratief promotor), ", 
-               Voornaam_Begel_1, " ", Naam_Begel_1," (", Functietype_Begel_1, "), ",
-               Voornaam_Begel_2, " ", Naam_Begel_2," (", Functietype_Begel_2, "), ",
-               Voornaam_Begel_3, " ", Naam_Begel_3," (", Functietype_Begel_3, "), ",
-               Voornaam_Begel_4, " ", Naam_Begel_4," (", Functietype_Begel_4, "), ",
-               Voornaam_Begel_5, " ", Naam_Begel_5," (", Functietype_Begel_5, ")."),
-        c(",   ()", "..")), norm),
+               " (administratief promotor, ", Vakgroepcode_Adm_Prom ,"), ",
+               committee, ".")), norm),
       fp_p = para),
     fpar(
       ftext("", norm),
@@ -168,6 +217,12 @@ extract_info_subset <- function(subset, type = c("html", ".docx")){
 extract_info <- function(data, type = c("html", ".docx")){
   type <- match.arg(type)
   dat_split <- split(data, f = data$Beoogde_doctorstitel)
+  
+  titles <- c("Doctor in de psychologie", "Doctor in de pedagogische wetenschappen", "Doctor in het sociaal werk", 
+              "Doctor in de digital humanities")
+  which_titles_present <- which(titles %in% names(dat_split))
+  
+  dat_split <- dat_split[titles[which_titles_present]]
   
   if(type == "html"){
     out_split <- lapply(dat_split, extract_info_subset)

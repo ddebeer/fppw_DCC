@@ -1,0 +1,13 @@
+name: get_DC_info
+title: get_DC_info
+username:
+account: ddebeer
+server: shinyapps.io
+hostUrl: https://api.shinyapps.io/v1
+appId: 7705860
+bundleId: 6568749
+url: https://ddebeer.shinyapps.io/get_DC_info/
+when: 1669747487.87659
+lastSyncTime: 1669747487.87661
+asMultiple: FALSE
+asStatic: FALSE

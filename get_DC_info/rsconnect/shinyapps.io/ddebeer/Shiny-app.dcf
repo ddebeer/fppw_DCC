@@ -1,0 +1,14 @@
+name: Shiny-app
+title: Shiny-app
+username:
+account: ddebeer
+server: shinyapps.io
+hostUrl: https://api.shinyapps.io/v1
+appId: 6018211
+bundleId: 5767641
+url: https://ddebeer.shinyapps.io/Shiny-app/
+when: 1649184365.66174
+lastSyncTime: 1649184365.66174
+asMultiple: FALSE
+asStatic: FALSE
+ignoredFiles: Copy of Inschrijvingsaanvragen doctoraat - 2022-04-01T13_13_57_064.xlsx|t.docx|test.docx
